@@ -1,4 +1,7 @@
-﻿public class Movie
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+public class Movie
 {
     public int Id { get; set; }
     public string Title { get; set; }
@@ -32,12 +35,25 @@ public class Theater
 public class Reservation
 {
     public int Id { get; set; }
+
+    [Required]
     public string CustomerName { get; set; }
+
+    [Required]
     public string CustomerEmail { get; set; }
+
     public DateTime ReservationTime { get; set; }
-    public int ScreeningId { get; set; }
-    public Screening Screening { get; set; }
+
+    [Required]
     public int SeatNumber { get; set; }
+
     public bool IsConfirmed { get; set; }
-    public string ConfirmationDocumentPath { get; set; }
+
+    public string ConfirmationDocumentPath { get; set; } // Usuń [Required]
+
+    // Zmień na samo ID zamiast całego obiektu
+    public int ScreeningId { get; set; }
+
+    [ForeignKey("ScreeningId")]
+    public Screening Screening { get; set; }
 }

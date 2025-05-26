@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddCors();
+
 // Add services to the container.
 
 builder.Services.AddControllers();
@@ -25,6 +27,11 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseAuthorization();
+
+app.UseCors(builder =>
+    builder.WithOrigins("http://localhost:3000") // adres twojego frontendu
+           .AllowAnyMethod()
+           .AllowAnyHeader());
 
 app.MapControllers();
 

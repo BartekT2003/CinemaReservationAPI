@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using CinemaReservationAPI.Models.DTOs;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 
@@ -32,6 +33,29 @@ public class ReservationsController : ControllerBase
         }
     }
 
+    [HttpGet("test-db")]
+    public IActionResult TestDbConnection()
+    {
+        try
+        {
+            var canConnect = _context.Database.CanConnect();
+            return Ok(new
+            {
+                Status = "Success",
+                Database = _context.Database.GetDbConnection().Database,
+                ConnectionState = _context.Database.GetDbConnection().State
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                Error = ex.Message,
+                ConnectionString = _context.Database.GetDbConnection().ConnectionString
+            });
+        }
+    }
+
     // GET: api/reservations/5
     [HttpGet("{id}")]
     public async Task<ActionResult<Reservation>> GetReservation(int id)
@@ -58,25 +82,35 @@ public class ReservationsController : ControllerBase
 
     // POST: api/reservations
     [HttpPost]
-    public async Task<ActionResult<Reservation>> CreateReservation([FromBody] Reservation reservation)
+    public async Task<ActionResult<Reservation>> CreateReservation([FromBody] ReservationCreateDTO reservationDto)
     {
-        try
+        if (!ModelState.IsValid)
         {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
-
-            reservation.ReservationTime = DateTime.Now;
-            _context.Reservations.Add(reservation);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetReservation), new { id = reservation.Id }, reservation);
+            return BadRequest(ModelState);
         }
-        catch (Exception ex)
+
+        var screening = await _context.Screenings
+            .FirstOrDefaultAsync(s => s.Id == reservationDto.ScreeningId);
+
+        if (screening == null)
         {
-            return StatusCode(500, new { Message = "Wystąpił błąd podczas tworzenia rezerwacji", Error = ex.Message });
+            return BadRequest("Invalid screening ID");
         }
+
+        var reservation = new Reservation
+        {
+            CustomerName = reservationDto.CustomerName,
+            CustomerEmail = reservationDto.CustomerEmail,
+            SeatNumber = reservationDto.SeatNumber,
+            ScreeningId = reservationDto.ScreeningId,
+            ReservationTime = DateTime.Now,
+            ConfirmationDocumentPath = "pending" // Tymczasowa wartość
+        };
+
+        _context.Reservations.Add(reservation);
+        await _context.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetReservation), new { id = reservation.Id }, reservation);
     }
 
     // PUT: api/reservations/5

@@ -22,7 +22,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Models\DTOs\" />
     <Folder Include="Services\" />
     <Folder Include="wwwroot\uploads\" />
   </ItemGroup>
