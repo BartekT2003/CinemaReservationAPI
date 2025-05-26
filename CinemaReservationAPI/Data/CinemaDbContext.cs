@@ -4,7 +4,8 @@ using System.Reflection.Emit;
 
 public class CinemaDbContext : DbContext
 {
-    public CinemaDbContext(DbContextOptions<CinemaDbContext> options) : base(options)
+    public CinemaDbContext(DbContextOptions<CinemaDbContext> options) 
+        : base(options)
     {
     }
 
@@ -39,8 +40,9 @@ public class CinemaDbContext : DbContext
         Description = "Film o snach",
         DurationMinutes = 148,
         Genre = "Sci-Fi",
-        ReleaseDate = new DateTime(2010, 7, 16)
-         }
+        ReleaseDate = new DateTime(2010, 7, 16),
+        PosterImagePath = "default-poster.jpg" // DODAJ TĘ LINIĘ
+        }
         );
     }
 }

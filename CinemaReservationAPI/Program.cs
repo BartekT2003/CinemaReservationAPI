@@ -9,6 +9,10 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Dodaj DbContext PRZED builder.Build()
+builder.Services.AddDbContext<CinemaDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("CinemaDb")));
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -24,7 +28,15 @@ app.UseAuthorization();
 
 app.MapControllers();
 
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
 app.Run();
 
-builder.Services.AddDbContext<CinemaDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("CinemaDb")));
+app.UseMiddleware<ErrorHandlingMiddleware>();
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();

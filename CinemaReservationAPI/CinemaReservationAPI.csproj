@@ -23,7 +23,6 @@
 
   <ItemGroup>
     <Folder Include="Models\DTOs\" />
-    <Folder Include="Middleware\" />
     <Folder Include="Services\" />
     <Folder Include="wwwroot\uploads\" />
   </ItemGroup>
