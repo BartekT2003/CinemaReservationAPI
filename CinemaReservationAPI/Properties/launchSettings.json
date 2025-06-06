@@ -9,6 +9,16 @@
     }
   },
   "profiles": {
+    "CinemaReservationAPI": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "launchUrl": "swagger",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "http://localhost:5192",
+      "dotnetRunMessages": true
+    },
     "http": {
       "commandName": "Project",
       "dotnetRunMessages": true,

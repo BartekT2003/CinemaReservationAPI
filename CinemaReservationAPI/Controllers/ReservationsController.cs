@@ -18,18 +18,50 @@ public class ReservationsController : ControllerBase
 
     // GET: api/reservations
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Reservation>>> GetReservations()
+    public async Task<ActionResult<IEnumerable<object>>> GetReservations()
     {
         try
         {
-            return await _context.Reservations
+            var reservations = await _context.Reservations
                 .Include(r => r.Screening)
                 .ThenInclude(s => s.Movie)
+                .Include(r => r.Screening)
+                .ThenInclude(s => s.Theater)
+                .Select(r => new
+                {
+                    r.Id,
+                    r.CustomerName,
+                    r.CustomerEmail,
+                    r.SeatNumber,
+                    r.ReservationTime,
+                    r.IsConfirmed,
+                    r.ConfirmationDocumentPath,
+                    Screening = new
+                    {
+                        r.Screening.Id,
+                        r.Screening.StartTime,
+                        Movie = new
+                        {
+                            r.Screening.Movie.Id,
+                            r.Screening.Movie.Title,
+                            r.Screening.Movie.Description,
+                            r.Screening.Movie.Genre
+                        },
+                        Theater = new
+                        {
+                            r.Screening.Theater.Id,
+                            r.Screening.Theater.Name,
+                            r.Screening.Theater.Capacity
+                        }
+                    }
+                })
                 .ToListAsync();
+
+            return Ok(reservations);
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { Message = "Wystąpił błąd podczas pobierania rezerwacji", Error = ex.Message });
+            return StatusCode(500, new { Message = "Error retrieving reservations", Error = ex.Message });
         }
     }
 
@@ -58,31 +90,62 @@ public class ReservationsController : ControllerBase
 
     // GET: api/reservations/5
     [HttpGet("{id}")]
-    public async Task<ActionResult<Reservation>> GetReservation(int id)
+    public async Task<ActionResult<object>> GetReservation(int id)
     {
         try
         {
             var reservation = await _context.Reservations
                 .Include(r => r.Screening)
                 .ThenInclude(s => s.Movie)
+                .Include(r => r.Screening)
+                .ThenInclude(s => s.Theater)
                 .FirstOrDefaultAsync(r => r.Id == id);
 
             if (reservation == null)
             {
-                return NotFound(new { Message = $"Nie znaleziono rezerwacji o ID {id}" });
+                return NotFound(new { Message = $"Reservation with ID {id} not found" });
             }
 
-            return reservation;
+            var result = new
+            {
+                reservation.Id,
+                reservation.CustomerName,
+                reservation.CustomerEmail,
+                reservation.SeatNumber,
+                reservation.ReservationTime,
+                reservation.IsConfirmed,
+                reservation.ConfirmationDocumentPath,
+                Screening = new
+                {
+                    reservation.Screening.Id,
+                    reservation.Screening.StartTime,
+                    Movie = new
+                    {
+                        reservation.Screening.Movie.Id,
+                        reservation.Screening.Movie.Title,
+                        reservation.Screening.Movie.Description,
+                        reservation.Screening.Movie.Genre
+                    },
+                    Theater = new
+                    {
+                        reservation.Screening.Theater.Id,
+                        reservation.Screening.Theater.Name,
+                        reservation.Screening.Theater.Capacity
+                    }
+                }
+            };
+
+            return Ok(result);
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { Message = $"Wystąpił błąd podczas pobierania rezerwacji o ID {id}", Error = ex.Message });
+            return StatusCode(500, new { Message = $"Error retrieving reservation with ID {id}", Error = ex.Message });
         }
     }
 
     // POST: api/reservations
     [HttpPost]
-    public async Task<ActionResult<Reservation>> CreateReservation([FromBody] ReservationCreateDTO reservationDto)
+    public async Task<ActionResult<object>> CreateReservation([FromBody] ReservationCreateDTO reservationDto)
     {
         if (!ModelState.IsValid)
         {
@@ -90,11 +153,28 @@ public class ReservationsController : ControllerBase
         }
 
         var screening = await _context.Screenings
+            .Include(s => s.Movie)
+            .Include(s => s.Theater)
             .FirstOrDefaultAsync(s => s.Id == reservationDto.ScreeningId);
 
         if (screening == null)
         {
             return BadRequest("Invalid screening ID");
+        }
+
+        // Check if seat number is within theater capacity
+        if (reservationDto.SeatNumber > screening.Theater.Capacity)
+        {
+            return BadRequest($"Invalid seat number. The theater capacity is {screening.Theater.Capacity} seats.");
+        }
+
+        // Check if seat is already taken
+        var isSeatTaken = await _context.Reservations
+            .AnyAsync(r => r.ScreeningId == reservationDto.ScreeningId && r.SeatNumber == reservationDto.SeatNumber);
+
+        if (isSeatTaken)
+        {
+            return BadRequest($"Seat {reservationDto.SeatNumber} is already taken.");
         }
 
         var reservation = new Reservation
@@ -104,13 +184,42 @@ public class ReservationsController : ControllerBase
             SeatNumber = reservationDto.SeatNumber,
             ScreeningId = reservationDto.ScreeningId,
             ReservationTime = DateTime.Now,
-            ConfirmationDocumentPath = "pending" // Tymczasowa wartość
+            ConfirmationDocumentPath = "pending"
         };
 
         _context.Reservations.Add(reservation);
         await _context.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetReservation), new { id = reservation.Id }, reservation);
+        var result = new
+        {
+            reservation.Id,
+            reservation.CustomerName,
+            reservation.CustomerEmail,
+            reservation.SeatNumber,
+            reservation.ReservationTime,
+            reservation.IsConfirmed,
+            reservation.ConfirmationDocumentPath,
+            Screening = new
+            {
+                screening.Id,
+                screening.StartTime,
+                Movie = new
+                {
+                    screening.Movie.Id,
+                    screening.Movie.Title,
+                    screening.Movie.Description,
+                    screening.Movie.Genre
+                },
+                Theater = new
+                {
+                    screening.Theater.Id,
+                    screening.Theater.Name,
+                    screening.Theater.Capacity
+                }
+            }
+        };
+
+        return CreatedAtAction(nameof(GetReservation), new { id = reservation.Id }, result);
     }
 
     // PUT: api/reservations/5
@@ -172,6 +281,45 @@ public class ReservationsController : ControllerBase
     private bool ReservationExists(int id)
     {
         return _context.Reservations.Any(e => e.Id == id);
+    }
+
+    // GET: api/reservations/screening/{screeningId}/taken-seats
+    [HttpGet("screening/{screeningId}/taken-seats")]
+    public async Task<ActionResult<IEnumerable<int>>> GetTakenSeats(int screeningId)
+    {
+        try
+        {
+            Console.WriteLine($"Fetching taken seats for screening {screeningId}");
+            
+            // First check if the screening exists
+            var screening = await _context.Screenings
+                .Include(s => s.Reservations)
+                .FirstOrDefaultAsync(s => s.Id == screeningId);
+                
+            if (screening == null)
+            {
+                Console.WriteLine($"Screening {screeningId} not found");
+                return NotFound(new { Message = $"Screening {screeningId} not found" });
+            }
+            
+            Console.WriteLine($"Found screening {screeningId}. Fetching reservations...");
+            
+            var takenSeats = await _context.Reservations
+                .Where(r => r.ScreeningId == screeningId)
+                .Select(r => r.SeatNumber)
+                .ToListAsync();
+
+            Console.WriteLine($"Found {takenSeats.Count} taken seats for screening {screeningId}");
+            Console.WriteLine($"Taken seats: {string.Join(", ", takenSeats)}");
+
+            return Ok(takenSeats);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error in GetTakenSeats: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            return StatusCode(500, new { Message = "Error retrieving taken seats", Error = ex.Message });
+        }
     }
 
     // POST: api/reservations/5/upload
@@ -257,5 +405,28 @@ public class ReservationsController : ControllerBase
             contentType = "application/octet-stream";
         }
         return contentType;
+    }
+
+    [HttpPut("{id}/status")]
+    public async Task<IActionResult> UpdateReservationStatus(int id, [FromBody] ReservationStatusUpdateDTO statusUpdate)
+    {
+        try
+        {
+            var reservation = await _context.Reservations.FindAsync(id);
+
+            if (reservation == null)
+            {
+                return NotFound(new { Message = $"Reservation with ID {id} not found" });
+            }
+
+            reservation.IsConfirmed = statusUpdate.IsConfirmed;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { Message = "Reservation status updated successfully", IsConfirmed = reservation.IsConfirmed });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Message = "Error updating reservation status", Error = ex.Message });
+        }
     }
 }

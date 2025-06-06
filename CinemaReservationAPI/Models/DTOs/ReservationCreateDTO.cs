@@ -12,7 +12,7 @@ namespace CinemaReservationAPI.Models.DTOs
         public string CustomerEmail { get; set; }
 
         [Required]
-        [Range(1, 100)]
+        [Range(1, 1000)]
         public int SeatNumber { get; set; }
 
         [Required]
